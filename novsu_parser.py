@@ -150,6 +150,25 @@ def parse_timetable(timetable_url: str, timezone: ZoneInfo, my_subgroup: Optiona
             exceptions = [datetime.strptime(f"{date_str}.{timetable_from.year}", '%d.%m.%Y').date()
                           for date_str in dates_strs]
 
+        only_match = re.match(r'Только ((?:\d+\.\d+\s*[;,и\s]*)+)', comment)
+        if only_match is not None:
+            dates_list = only_match.group(1)
+            dates_strs = re.findall(r'\d+\.\d+', dates_list)
+
+            only_dates = [datetime.strptime(f"{date_str}.{timetable_from.year}", '%d.%m.%Y').date()
+                          for date_str in dates_strs]
+            only_dates.sort()
+
+            lesson_first = only_dates[0]
+            lesson_until = only_dates[-1] + timedelta(days=1)  # inclusive -> exclusive
+
+            for i in range(len(only_dates)-1):
+                current = only_dates[i] + timedelta(days=7)
+
+                while current < only_dates[i+1]:
+                    exceptions.append(current)
+                    current += timedelta(days=7)
+
         from_match = re.search(r'с (\d+\.\d+)', comment)
         if from_match is not None:
             date_str = from_match.group(1)
