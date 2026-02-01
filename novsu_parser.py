@@ -142,37 +142,18 @@ def parse_timetable(timetable_url: str, timezone: ZoneInfo, my_subgroup: Optiona
             continue
 
         exceptions: list[date] = []  # Days when this lesson is skipped
-        exc_match = re.search(r'((?:\d+\.\d+\s*[;,и\s]*)+) занятий не будет', comment)
+        exc_match = re.search(r'((?:\d+\.\s*\d+\s*[;,и\s]*)+) занятий не будет', comment)
         if exc_match is not None:
             dates_list = exc_match.group(1)
-            dates_strs = re.findall(r'\d+\.\d+', dates_list)
+            dates_strs = re.findall(r'\d+\.\s*\d+', dates_list)
 
-            exceptions = [datetime.strptime(f"{date_str}.{timetable_from.year}", '%d.%m.%Y').date()
+            exceptions = [datetime.strptime(f"{date_str.replace(' ', '')}.{timetable_from.year}", '%d.%m.%Y').date()
                           for date_str in dates_strs]
 
-        only_match = re.match(r'Только ((?:\d+\.\d+\s*[;,и\s]*)+)', comment)
-        if only_match is not None:
-            dates_list = only_match.group(1)
-            dates_strs = re.findall(r'\d+\.\d+', dates_list)
-
-            only_dates = [datetime.strptime(f"{date_str}.{timetable_from.year}", '%d.%m.%Y').date()
-                          for date_str in dates_strs]
-            only_dates.sort()
-
-            lesson_first = only_dates[0]
-            lesson_until = only_dates[-1] + timedelta(days=1)  # inclusive -> exclusive
-
-            for i in range(len(only_dates)-1):
-                current = only_dates[i] + timedelta(days=7)
-
-                while current < only_dates[i+1]:
-                    exceptions.append(current)
-                    current += timedelta(days=7)
-
-        from_match = re.search(r'с (\d+\.\d+)', comment)
+        from_match = re.search(r'с (\d+\.\s*\d+)', comment)
         if from_match is not None:
             date_str = from_match.group(1)
-            lesson_first = datetime.strptime(f"{date_str}.{timetable_from.year}", '%d.%m.%Y').date()
+            lesson_first = datetime.strptime(f"{date_str.replace(' ', '')}.{timetable_from.year}", '%d.%m.%Y').date()
 
             # Check if this overlaps with previous lesson row
             if subgroup is None and not has_hours:
@@ -181,11 +162,29 @@ def parse_timetable(timetable_url: str, timezone: ZoneInfo, my_subgroup: Optiona
                         # They assumed that current lesson replaces previous one on given date
                         prev_lesson.date_until = lesson_first
 
-        to_match = re.search(r'(?:по|до) (\d+\.\d+)', comment)
+        to_match = re.search(r'(?:по|до) (\d+\.\s*\d+)', comment)
         if to_match is not None:
             date_str = to_match.group(1)
-            lesson_until = datetime.strptime(f"{date_str}.{timetable_from.year}", '%d.%m.%Y').date()
+            lesson_until = datetime.strptime(f"{date_str.replace(' ', '')}.{timetable_from.year}", '%d.%m.%Y').date()
             lesson_until += timedelta(days=1)  # inclusive -> exclusive
+
+        if exc_match is None and from_match is None and to_match is None: 
+            dates_strs = re.findall(r'\d+\.\s*\d+', comment)
+
+            if dates_strs: # "Only on" dates
+                only_dates = [datetime.strptime(f"{date_str.replace(' ', '')}.{timetable_from.year}", '%d.%m.%Y').date()
+                              for date_str in dates_strs]
+                only_dates.sort()
+
+                lesson_first = only_dates[0]
+                lesson_until = only_dates[-1] + timedelta(days=1)  # inclusive -> exclusive
+
+                for i in range(len(only_dates)-1):
+                    current = only_dates[i] + timedelta(days=7)
+
+                    while current < only_dates[i+1]:
+                        exceptions.append(current)
+                        current += timedelta(days=7)
 
         if "неделе" in comment:  # only on "upper" or "lower" weeks
             # first week is always the upper week
