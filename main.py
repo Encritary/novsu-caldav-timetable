@@ -29,7 +29,7 @@ def main() -> None:
               f"{timetable.dt_to.strftime('%Y-%m-%d')}, got {len(timetable.lessons)} lessons")
 
         # Purge existing events to put the new ones on their place
-        existing_events = calendar.search(start=timetable.dt_from, end=timetable.dt_to)
+        existing_events = calendar.search(event=True, start=timetable.dt_from, end=timetable.dt_to)
         for i, event in enumerate(existing_events):
             print(f"Deleting existing events... ({i} / {len(existing_events)})")
 
